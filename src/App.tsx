@@ -242,20 +242,28 @@ export default function App() {
       <section className="card card-grid">
         <div className="section-head">
           <h2>受控浏览器</h2>
-          <span className="hint">默认 Edge，可手动切 Chrome</span>
+          <span className="hint">默认 Edge，可切 Chrome</span>
         </div>
         <div className="control-panel">
-          <label className="field">
+          <div className="browser-switcher">
             <span className="field-label">浏览器</span>
-            <select
-              value={status?.selected_browser ?? 'edge'}
-              onChange={(event) => changeBrowser(event.target.value as BrowserKind)}
-            >
+            <div className="segment-control" role="tablist" aria-label="选择受控浏览器">
               {(status?.supported_browsers ?? ['edge', 'chrome']).map((browser) => (
-                <option key={browser} value={browser}>{browserLabel(browser)}</option>
+                <button
+                  key={browser}
+                  type="button"
+                  className={`segment-option ${status?.selected_browser === browser ? 'active' : ''}`}
+                  onClick={() => changeBrowser(browser)}
+                >
+                  {browser === 'edge' ? 'Edge' : 'Chrome'}
+                </button>
               ))}
-            </select>
-          </label>
+            </div>
+          </div>
+          <div className="browser-summary">
+            <strong>{browserLabel(status?.selected_browser ?? 'edge')}</strong>
+            <span>受控打开的新浏览器进程才会使用 FlowRoute 代理</span>
+          </div>
           <div className="actions spacious">
             <button className="primary-wide" disabled={!status?.running || bootstrapping} onClick={openBrowser}>
               打开受控浏览器

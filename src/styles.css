@@ -56,7 +56,7 @@ select {
   min-width: 0;
   flex: 1;
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .hero-topline {
@@ -93,8 +93,8 @@ select {
 
 h1 {
   margin: 0;
-  font-size: 34px;
-  line-height: 1.06;
+  font-size: 30px;
+  line-height: 1.08;
   letter-spacing: -0.04em;
 }
 
@@ -116,7 +116,7 @@ h2 {
   background: linear-gradient(180deg, rgba(13, 22, 39, 0.96), rgba(10, 18, 33, 0.9));
   border: 1px solid rgba(110, 131, 169, 0.16);
   border-radius: 24px;
-  padding: 20px;
+  padding: 22px;
   box-shadow: 0 20px 70px rgba(2, 6, 23, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(18px);
   min-width: 0;
@@ -215,7 +215,7 @@ h2 {
 
 .control-panel {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .section-head {
@@ -316,11 +316,6 @@ button.power.stop {
   min-width: 180px;
 }
 
-.field {
-  display: grid;
-  gap: 8px;
-}
-
 .field-label {
   font-size: 12px;
   color: #93a7c9;
@@ -328,7 +323,6 @@ button.power.stop {
   letter-spacing: 0.08em;
 }
 
-select,
 input {
   width: 100%;
   border-radius: 16px;
@@ -337,6 +331,57 @@ input {
   color: #edf2ff;
   padding: 14px 16px;
   outline: none;
+}
+
+.browser-switcher {
+  display: grid;
+  gap: 10px;
+}
+
+.segment-control {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 6px;
+  border-radius: 18px;
+  background: rgba(9, 15, 28, 0.92);
+  border: 1px solid rgba(110, 131, 169, 0.16);
+}
+
+.segment-option {
+  min-width: 132px;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: transparent;
+  color: #9fb0cb;
+  box-shadow: none;
+}
+
+.segment-option.active {
+  background: linear-gradient(135deg, #1d4ed8, #0ea5e9);
+  color: #ffffff;
+  box-shadow: 0 14px 30px rgba(14, 165, 233, 0.22);
+}
+
+.browser-summary {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(9, 15, 28, 0.78);
+  border: 1px solid rgba(110, 131, 169, 0.12);
+}
+
+.browser-summary strong {
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.browser-summary span {
+  color: #90a1bc;
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .list {
