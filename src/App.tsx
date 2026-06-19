@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, AppSettings, ConnectionItem, StatusResponse, UserRule } from './api';
+import { api, AppSettings, BrowserKind, ConnectionItem, StatusResponse, UserRule } from './api';
 
 function actionLabel(chains: string[]) {
   const joined = chains.join(' ');
   if (joined.includes('DIRECT')) return '直连';
   if (joined.includes('UPSTREAM') || joined.includes('PROXY')) return '代理';
   return joined || '未知';
+}
+
+function browserLabel(browser: BrowserKind) {
+  return browser === 'edge' ? 'Microsoft Edge' : 'Google Chrome';
 }
 
 export default function App() {
@@ -85,7 +89,7 @@ export default function App() {
     setMessage('');
     const turningOn = !status?.running;
     if (status) {
-      setStatus({ ...status, running: turningOn, system_proxy: turningOn });
+      setStatus({ ...status, running: turningOn });
     }
     try {
       const next = turningOn ? await api.start() : await api.stop();
@@ -125,6 +129,26 @@ export default function App() {
       setMessage('上游代理已保存，重新开启分流后生效');
     });
 
+  const changeBrowser = async (browser: BrowserKind) => {
+    try {
+      const next = await api.setBrowser(browser);
+      setStatus(next);
+      setMessage(`已切换浏览器为 ${browserLabel(browser)}`);
+    } catch (error) {
+      setMessage(String(error));
+    }
+  };
+
+  const openBrowser = async () => {
+    try {
+      const next = await api.openBrowser(status?.selected_browser, currentPage ?? undefined);
+      setStatus(next);
+      setMessage(`已通过 ${browserLabel(next.selected_browser)} 打开受控浏览器`);
+    } catch (error) {
+      setMessage(String(error));
+    }
+  };
+
   const ruleAction = (domain: string) => rules.find((item) => item.domain === domain)?.action;
 
   return (
@@ -146,8 +170,8 @@ export default function App() {
           </div>
           <p className="hint">
             {status?.running
-              ? `系统代理 127.0.0.1:${status.mixed_port}，浏览器会自动生效`
-              : '开启后会设置系统代理，并加载内置规则'}
+              ? `本地代理 127.0.0.1:${status.mixed_port} 已就绪，仅对通过 FlowRoute 打开的浏览器生效`
+              : '开启后只会启动本地分流核心，不会修改系统代理，也不会影响 git 等命令行工具'}
           </p>
         </div>
         <button
@@ -157,6 +181,30 @@ export default function App() {
         >
           {toggleBusy ? '处理中…' : status?.running ? '关闭' : '开启分流'}
         </button>
+      </section>
+
+      <section className="card">
+        <div className="section-head">
+          <h2>受控浏览器</h2>
+          <span className="hint">仅支持 Edge / Chrome</span>
+        </div>
+        <label>
+          浏览器
+          <select
+            value={status?.selected_browser ?? 'edge'}
+            onChange={(event) => changeBrowser(event.target.value as BrowserKind)}
+          >
+            {(status?.supported_browsers ?? ['edge', 'chrome']).map((browser) => (
+              <option key={browser} value={browser}>{browserLabel(browser)}</option>
+            ))}
+          </select>
+        </label>
+        <div className="actions">
+          <button disabled={!status?.running} onClick={openBrowser}>打开受控浏览器</button>
+        </div>
+        <p className="hint">
+          只有从这里打开的新浏览器进程会使用 FlowRoute 代理，已有浏览器窗口和 git 命令不会受影响。
+        </p>
       </section>
 
       <section className="card">
@@ -176,7 +224,7 @@ export default function App() {
             </div>
           </>
         ) : (
-          <p className="hint">未检测到浏览器标签页。请先在 Edge / Chrome 打开网页，再点刷新。</p>
+          <p className="hint">未检测到 Edge / Chrome 当前标签页。请先用上面的按钮打开浏览器，再点刷新。</p>
         )}
       </section>
 

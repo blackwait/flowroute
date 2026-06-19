@@ -3,33 +3,35 @@ mod clash_api;
 mod config;
 mod dns_check;
 mod mihomo;
-mod sysproxy;
 
+use browser::{launch_browser, supported_browsers, BrowserKind};
 use config::{load_settings, save_settings, AppSettings, UserRule, MIXED_PORT};
 use clash_api::{fetch_connections, remove_user_rule, upsert_user_rule, AddRuleResult, ConnectionItem};
-use mihomo::{reload_running_config, spawn_mihomo, stop_child, wait_until_ready};
+use mihomo::{spawn_mihomo, stop_child, wait_until_ready};
 use std::process::Child;
 use std::sync::Mutex;
 use tauri::{Manager, RunEvent, State};
 
 struct EngineState {
   child: Mutex<Option<Child>>,
-  proxy_on: Mutex<bool>,
+  selected_browser: Mutex<BrowserKind>,
 }
 
 #[derive(serde::Serialize)]
 struct StatusResponse {
   running: bool,
-  system_proxy: bool,
+  selected_browser: BrowserKind,
+  supported_browsers: Vec<BrowserKind>,
   mixed_port: u16,
   settings: AppSettings,
 }
 
 fn build_status(state: &EngineState, running: bool) -> StatusResponse {
-  let system_proxy = *state.proxy_on.lock().unwrap();
+  let selected_browser = *state.selected_browser.lock().unwrap();
   StatusResponse {
     running,
-    system_proxy,
+    selected_browser,
+    supported_browsers: supported_browsers(),
     mixed_port: MIXED_PORT,
     settings: load_settings(),
   }
@@ -58,8 +60,6 @@ fn start_routing(state: State<'_, EngineState>) -> Result<StatusResponse, String
     *guard = Some(child);
   }
   wait_until_ready();
-  sysproxy::enable_system_proxy()?;
-  *state.proxy_on.lock().unwrap() = true;
   Ok(build_status(&state, true))
 }
 
@@ -71,9 +71,27 @@ fn stop_routing(state: State<'_, EngineState>) -> Result<StatusResponse, String>
       stop_child(&mut child);
     }
   }
-  sysproxy::disable_system_proxy()?;
-  *state.proxy_on.lock().unwrap() = false;
   Ok(build_status(&state, false))
+}
+
+#[tauri::command]
+fn set_browser(state: State<'_, EngineState>, browser: BrowserKind) -> Result<StatusResponse, String> {
+  *state.selected_browser.lock().unwrap() = browser;
+  let running = state.child.lock().unwrap().is_some();
+  Ok(build_status(&state, running))
+}
+
+#[tauri::command]
+fn open_browser(
+  state: State<'_, EngineState>,
+  browser: Option<BrowserKind>,
+  url: Option<String>,
+) -> Result<StatusResponse, String> {
+  let chosen = browser.unwrap_or(*state.selected_browser.lock().unwrap());
+  launch_browser(chosen, url.as_deref())?;
+  *state.selected_browser.lock().unwrap() = chosen;
+  let running = state.child.lock().unwrap().is_some();
+  Ok(build_status(&state, running))
 }
 
 #[tauri::command]
@@ -108,13 +126,15 @@ pub fn run() {
   tauri::Builder::default()
     .manage(EngineState {
       child: Mutex::new(None),
-      proxy_on: Mutex::new(false),
+      selected_browser: Mutex::new(BrowserKind::Edge),
     })
     .invoke_handler(tauri::generate_handler![
       get_status,
       save_app_settings,
       start_routing,
       stop_routing,
+      set_browser,
+      open_browser,
       get_connections,
       get_user_rules,
       add_rule,
@@ -131,7 +151,6 @@ pub fn run() {
             stop_child(&mut child);
           }
         }
-        let _ = sysproxy::disable_system_proxy();
       }
     });
 }

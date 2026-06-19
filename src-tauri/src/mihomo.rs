@@ -40,6 +40,9 @@ pub fn write_mihomo_config(settings: &AppSettings) -> Result<(), String> {
   let dns_policy = config::build_dns_policy(&rules);
   let dns_hosts = config::build_dns_hosts(&rules);
   let sniffer_skip = config::build_sniffer_skip_domains(&rules);
+  let local_dns_policy = config::build_local_direct_dns_policy();
+  let local_dns_hosts = config::build_local_direct_hosts();
+  let local_direct_rules = config::build_local_direct_rules();
 
   let proxy_type = match settings.upstream.proxy_type {
     config::ProxyType::Http => "http",
@@ -90,7 +93,7 @@ dns:
     '+.google.com': [https://dns.google/dns-query, 8.8.8.8]
     '+.google.com.hk': [https://dns.google/dns-query, 8.8.8.8]
     '+.google.cn': [https://dns.google/dns-query, 8.8.8.8]
-{dns_policy}{dns_hosts}proxies:
+{local_dns_policy}{dns_policy}{local_dns_hosts}{dns_hosts}proxies:
   - name: UPSTREAM
     type: {proxy_type}
     server: {server}
@@ -112,7 +115,7 @@ rule-providers:
     interval: 86400
 
 rules:
-{user_rules}{google_rules}
+{local_direct_rules}{user_rules}{google_rules}
   - RULE-SET,gfwlist,PROXY
   - GEOIP,CN,DIRECT,no-resolve
   - MATCH,DIRECT
@@ -120,9 +123,12 @@ rules:
     mixed_port = MIXED_PORT,
     api_port = config::API_PORT,
     secret = config::API_SECRET,
+    local_dns_policy = local_dns_policy,
     dns_policy = dns_policy,
+    local_dns_hosts = local_dns_hosts,
     dns_hosts = dns_hosts,
     sniffer_skip = sniffer_skip,
+    local_direct_rules = local_direct_rules,
     proxy_type = proxy_type,
     server = settings.upstream.host,
     port = settings.upstream.port,

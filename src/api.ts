@@ -12,9 +12,12 @@ export interface AppSettings {
   upstream: UpstreamProxy;
 }
 
+export type BrowserKind = 'edge' | 'chrome';
+
 export interface StatusResponse {
   running: boolean;
-  system_proxy: boolean;
+  selected_browser: BrowserKind;
+  supported_browsers: BrowserKind[];
   mixed_port: number;
   settings: AppSettings;
 }
@@ -42,6 +45,8 @@ export const api = {
   saveSettings: (settings: AppSettings) => invoke<void>('save_app_settings', { settings }),
   start: () => invoke<StatusResponse>('start_routing'),
   stop: () => invoke<StatusResponse>('stop_routing'),
+  setBrowser: (browser: BrowserKind) => invoke<StatusResponse>('set_browser', { browser }),
+  openBrowser: (browser?: BrowserKind, url?: string) => invoke<StatusResponse>('open_browser', { browser, url }),
   getConnections: () => invoke<ConnectionItem[]>('get_connections'),
   getUserRules: () => invoke<UserRule[]>('get_user_rules'),
   addRule: (domain: string, action: 'proxy' | 'direct') =>

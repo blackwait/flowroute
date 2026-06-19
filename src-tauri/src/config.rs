@@ -187,6 +187,9 @@ pub fn build_dns_hosts(rules: &[UserRule]) -> String {
 
 pub fn build_sniffer_skip_domains(rules: &[UserRule]) -> String {
   let mut patterns = BTreeSet::new();
+  for domain in local_direct_domains() {
+    patterns.insert(format!("    - '{}'", domain));
+  }
   for rule in rules {
     if rule.action != "direct" {
       continue;
@@ -201,6 +204,38 @@ pub fn build_sniffer_skip_domains(rules: &[UserRule]) -> String {
     return String::new();
   }
   format!("  skip-domain:\n{}\n", patterns.into_iter().collect::<Vec<_>>().join("\n"))
+}
+
+pub fn build_local_direct_dns_policy() -> String {
+  let mut block = String::new();
+  for domain in local_direct_domains() {
+    block.push_str(&format!("    '{}': [system]\n", domain));
+  }
+  block
+}
+
+pub fn build_local_direct_hosts() -> String {
+  "  hosts:\n    'localhost': 127.0.0.1\n".into()
+}
+
+pub fn build_local_direct_rules() -> String {
+  r#"  - DOMAIN,localhost,DIRECT
+  - DOMAIN-SUFFIX,local,DIRECT
+  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
+  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
+  - IP-CIDR,169.254.0.0/16,DIRECT,no-resolve
+  - IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
+  - IP-CIDR6,::1/128,DIRECT,no-resolve
+  - IP-CIDR6,fc00::/7,DIRECT,no-resolve
+  - IP-CIDR6,fe80::/10,DIRECT,no-resolve
+"#
+  .into()
+}
+
+fn local_direct_domains() -> &'static [&'static str] {
+  &["localhost", "+.local", "*.local"]
 }
 
 pub fn ensure_gfw_rules() {

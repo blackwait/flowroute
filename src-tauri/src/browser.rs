@@ -1,12 +1,43 @@
 use crate::clash_api::normalize_domain;
+use crate::config::MIXED_PORT;
+use serde::{Deserialize, Serialize};
 use std::process::Command;
 
-const BROWSERS: &[(&str, &str)] = &[
-  ("Microsoft Edge", r#"tell application "Microsoft Edge" to if (count of windows) > 0 then return URL of active tab of front window"#),
-  ("Google Chrome", r#"tell application "Google Chrome" to if (count of windows) > 0 then return URL of active tab of front window"#),
-  ("Safari", r#"tell application "Safari" to if (count of windows) > 0 then return URL of current tab of front window"#),
-  ("Arc", r#"tell application "Arc" to if (count of windows) > 0 then return URL of active tab of front window"#),
-];
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BrowserKind {
+  Edge,
+  Chrome,
+}
+
+impl BrowserKind {
+  pub fn label(self) -> &'static str {
+    match self {
+      Self::Edge => "Microsoft Edge",
+      Self::Chrome => "Google Chrome",
+    }
+  }
+
+  fn bundle_id(self) -> &'static str {
+    match self {
+      Self::Edge => "com.microsoft.edgemac",
+      Self::Chrome => "com.google.Chrome",
+    }
+  }
+
+  fn current_tab_script(self) -> String {
+    format!(
+      r#"tell application "{}" to if (count of windows) > 0 then return URL of active tab of front window"#,
+      self.label()
+    )
+  }
+}
+
+const SUPPORTED_BROWSERS: &[BrowserKind] = &[BrowserKind::Edge, BrowserKind::Chrome];
+
+pub fn supported_browsers() -> Vec<BrowserKind> {
+  SUPPORTED_BROWSERS.to_vec()
+}
 
 pub fn current_browser_url() -> Result<Option<String>, String> {
   #[cfg(not(target_os = "macos"))]
@@ -16,12 +47,12 @@ pub fn current_browser_url() -> Result<Option<String>, String> {
 
   #[cfg(target_os = "macos")]
   {
-    for (name, script) in BROWSERS {
+    for browser in SUPPORTED_BROWSERS {
       let output = Command::new("osascript")
         .arg("-e")
-        .arg(*script)
+        .arg(browser.current_tab_script())
         .output()
-        .map_err(|e| format!("读取 {name} 失败: {e}"))?;
+        .map_err(|e| format!("读取 {} 失败: {e}", browser.label()))?;
       if !output.status.success() {
         continue;
       }
@@ -31,5 +62,36 @@ pub fn current_browser_url() -> Result<Option<String>, String> {
       }
     }
     Ok(None)
+  }
+}
+
+pub fn launch_browser(browser: BrowserKind, target: Option<&str>) -> Result<(), String> {
+  #[cfg(not(target_os = "macos"))]
+  {
+    let _ = (browser, target);
+    Err("当前仅支持 macOS".into())
+  }
+
+  #[cfg(target_os = "macos")]
+  {
+    let mut command = Command::new("open");
+    command
+      .arg("-n")
+      .arg("-b")
+      .arg(browser.bundle_id())
+      .arg("--args")
+      .arg(format!("--proxy-server=http://127.0.0.1:{MIXED_PORT}"));
+
+    if let Some(url) = target {
+      let trimmed = url.trim();
+      if !trimmed.is_empty() {
+        command.arg(trimmed);
+      }
+    }
+
+    command
+      .spawn()
+      .map_err(|e| format!("启动 {} 失败: {e}", browser.label()))?;
+    Ok(())
   }
 }
