@@ -169,8 +169,8 @@ export default function App() {
   const ruleAction = (domain: string) => rules.find((item) => item.domain === domain)?.action;
   const currentStatusText = status?.running ? '分流在线' : bootstrapping ? '正在启动' : '分流关闭';
   const primaryHint = status?.running
-    ? `本地代理 127.0.0.1:${status.mixed_port} 已就绪，默认使用 ${browserLabel(status.selected_browser)}`
-    : '启动后只会接管通过 FlowRoute 打开的浏览器，不影响系统代理、git 和其它应用';
+    ? `127.0.0.1:${status.mixed_port} / ${browserLabel(status.selected_browser)}`
+    : '不改系统代理，不影响 git 和其它应用';
 
   return (
     <div className="app">
@@ -180,8 +180,8 @@ export default function App() {
             <p className="eyebrow">FlowRoute</p>
             <span className={`hero-pill ${status?.running ? 'live' : 'idle'}`}>{currentStatusText}</span>
           </div>
-          <h1>启动即分流，浏览器直接可用</h1>
-          <p className="subtitle">默认打开就启用分流，默认锁定 Edge。</p>
+          <h1>FlowRoute</h1>
+          <p className="subtitle">启动即分流，默认 Edge。</p>
         </div>
         <button className="ghost hero-settings" onClick={openSettings}>设置</button>
       </header>
@@ -221,24 +221,17 @@ export default function App() {
           <span className="section-tag">Edge / Chrome</span>
         </div>
         <div className="control-panel">
-          <div className="browser-switcher">
-            <span className="field-label">浏览器</span>
-            <div className="segment-control" role="tablist" aria-label="选择受控浏览器">
-              {(status?.supported_browsers ?? ['edge', 'chrome']).map((browser) => (
-                <button
-                  key={browser}
-                  type="button"
-                  className={`segment-option ${status?.selected_browser === browser ? 'active' : ''}`}
-                  onClick={() => changeBrowser(browser)}
-                >
-                  {browser === 'edge' ? 'Edge' : 'Chrome'}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="browser-summary">
-            <strong>{browserLabel(status?.selected_browser ?? 'edge')}</strong>
-            <span>只有从这里打开的新浏览器进程才会使用 FlowRoute 代理</span>
+          <div className="segment-control" role="tablist" aria-label="选择受控浏览器">
+            {(status?.supported_browsers ?? ['edge', 'chrome']).map((browser) => (
+              <button
+                key={browser}
+                type="button"
+                className={`segment-option ${status?.selected_browser === browser ? 'active' : ''}`}
+                onClick={() => changeBrowser(browser)}
+              >
+                {browser === 'edge' ? 'Edge' : 'Chrome'}
+              </button>
+            ))}
           </div>
           <div className="actions spacious">
             <button className="primary-wide" disabled={!status?.running || bootstrapping} onClick={openBrowser}>
@@ -249,9 +242,6 @@ export default function App() {
             </button>
           </div>
         </div>
-        <p className="hint">
-          只有从这里打开的新浏览器进程会使用 FlowRoute 代理。已有浏览器窗口、git 命令和其它桌面应用不会受影响。
-        </p>
       </section>
 
       <section className="card">
