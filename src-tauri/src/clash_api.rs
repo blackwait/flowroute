@@ -88,14 +88,26 @@ pub fn normalize_domain(input: &str) -> Option<String> {
   if trimmed.is_empty() {
     return None;
   }
+  let lower = trimmed.to_lowercase();
+  if lower.contains("://") && !lower.starts_with("http://") && !lower.starts_with("https://") {
+    return None;
+  }
   let without_scheme = trimmed
     .trim_start_matches("https://")
     .trim_start_matches("http://");
   let host = without_scheme.split('/').next()?.split(':').next()?.trim();
-  if host.is_empty() || host.contains(' ') {
+  let host = host.to_lowercase();
+  if host.is_empty() || host.contains(' ') || is_browser_internal_host(&host) {
     return None;
   }
-  Some(host.to_lowercase())
+  Some(host)
+}
+
+fn is_browser_internal_host(host: &str) -> bool {
+  matches!(
+    host,
+    "about" | "blank" | "chrome" | "edge" | "newtab" | "devtools" | "extensions" | "settings"
+  )
 }
 
 fn apply_rules(rules: &[UserRule]) -> Result<(), String> {
