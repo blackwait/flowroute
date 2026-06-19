@@ -23,6 +23,7 @@ export default function App() {
   const [message, setMessage] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft] = useState<AppSettings | null>(null);
+  const [bootstrapping, setBootstrapping] = useState(true);
 
   const refreshLight = useCallback(async () => {
     const [nextStatus, nextRules] = await Promise.all([api.getStatus(), api.getUserRules()]);
@@ -65,10 +66,43 @@ export default function App() {
   }, [refreshLight, refreshHeavy]);
 
   useEffect(() => {
-    refresh();
-    const timer = window.setInterval(refresh, 3000);
+    let disposed = false;
+
+    const bootstrap = async () => {
+      try {
+        const [initialStatus, nextRules] = await Promise.all([api.getStatus(), api.getUserRules()]);
+        if (disposed) return;
+        setRules(nextRules);
+
+        let nextStatus = initialStatus;
+        if (initialStatus.selected_browser !== 'edge') {
+          nextStatus = await api.setBrowser('edge');
+          if (disposed) return;
+        }
+        if (!nextStatus.running) {
+          nextStatus = await api.start();
+          if (disposed) return;
+        }
+
+        setStatus(nextStatus);
+        await refreshHeavy();
+      } catch (error) {
+        if (!disposed) {
+          setMessage(String(error));
+        }
+      } finally {
+        if (!disposed) {
+          setBootstrapping(false);
+        }
+      }
+    };
+
+    bootstrap();
+    const timer = window.setInterval(() => {
+      void refresh();
+    }, 3000);
     return () => window.clearInterval(timer);
-  }, [refresh]);
+  }, [refresh, refreshHeavy]);
 
   const withBusy = async (task: () => Promise<void>) => {
     setBusy(true);
@@ -150,60 +184,89 @@ export default function App() {
   };
 
   const ruleAction = (domain: string) => rules.find((item) => item.domain === domain)?.action;
+  const currentStatusText = status?.running ? '分流在线' : bootstrapping ? '正在启动' : '分流关闭';
+  const primaryHint = status?.running
+    ? `本地代理 127.0.0.1:${status.mixed_port} 已就绪，默认使用 ${browserLabel(status.selected_browser)}`
+    : '启动后只会接管通过 FlowRoute 打开的浏览器，不影响系统代理、git 和其它应用';
 
   return (
     <div className="app">
       <header className="hero">
-        <div>
-          <p className="eyebrow">FlowRoute</p>
-          <h1>一键分流，不用浏览器扩展</h1>
-          <p className="subtitle">内置 GFW 规则，遇到新网站点一下就能决定走代理还是直连。</p>
+        <div className="hero-copy">
+          <div className="hero-topline">
+            <p className="eyebrow">FlowRoute</p>
+            <span className={`hero-pill ${status?.running ? 'live' : 'idle'}`}>{currentStatusText}</span>
+          </div>
+          <h1>启动即分流，浏览器直接可用</h1>
+          <p className="subtitle">默认打开就启用分流，默认锁定 Edge。新网页进来后，规则切换和浏览器打开都在一屏完成。</p>
         </div>
-        <button className="ghost" onClick={openSettings}>设置</button>
+        <button className="ghost hero-settings" onClick={openSettings}>设置</button>
       </header>
 
-      <section className="card power-card">
-        <div>
+      <section className="card power-card accent-card">
+        <div className="power-copy">
           <div className="status-line">
             <span className={`dot ${status?.running ? 'on' : 'off'}`} />
-            <strong>{status?.running ? '分流已开启' : '分流已关闭'}</strong>
+            <strong>{bootstrapping ? '启动中…' : status?.running ? '分流已开启' : '分流已关闭'}</strong>
           </div>
-          <p className="hint">
-            {status?.running
-              ? `本地代理 127.0.0.1:${status.mixed_port} 已就绪，仅对通过 FlowRoute 打开的浏览器生效`
-              : '开启后只会启动本地分流核心，不会修改系统代理，也不会影响 git 等命令行工具'}
-          </p>
+          <p className="subtitle power-subtitle">{primaryHint}</p>
+          <div className="metric-row">
+            <div className="metric-chip">
+              <span>默认浏览器</span>
+              <strong>{browserLabel(status?.selected_browser ?? 'edge')}</strong>
+            </div>
+            <div className="metric-chip">
+              <span>代理端口</span>
+              <strong>{status?.mixed_port ?? 17890}</strong>
+            </div>
+          </div>
         </div>
-        <button
-          className={`power ${status?.running ? 'stop' : 'start'}`}
-          disabled={toggleBusy}
-          onClick={toggleRouting}
-        >
-          {toggleBusy ? '处理中…' : status?.running ? '关闭' : '开启分流'}
-        </button>
+        <div className="stack-actions">
+          <button
+            className={`power ${status?.running ? 'stop' : 'start'}`}
+            disabled={toggleBusy || bootstrapping}
+            onClick={toggleRouting}
+          >
+            {toggleBusy ? '处理中…' : status?.running ? '关闭分流' : '开启分流'}
+          </button>
+          <button
+            className="secondary quick-open"
+            disabled={!status?.running || bootstrapping}
+            onClick={openBrowser}
+          >
+            立即打开 Edge
+          </button>
+        </div>
       </section>
 
-      <section className="card">
+      <section className="card card-grid">
         <div className="section-head">
           <h2>受控浏览器</h2>
-          <span className="hint">仅支持 Edge / Chrome</span>
+          <span className="hint">默认 Edge，可手动切 Chrome</span>
         </div>
-        <label>
-          浏览器
-          <select
-            value={status?.selected_browser ?? 'edge'}
-            onChange={(event) => changeBrowser(event.target.value as BrowserKind)}
-          >
-            {(status?.supported_browsers ?? ['edge', 'chrome']).map((browser) => (
-              <option key={browser} value={browser}>{browserLabel(browser)}</option>
-            ))}
-          </select>
-        </label>
-        <div className="actions">
-          <button disabled={!status?.running} onClick={openBrowser}>打开受控浏览器</button>
+        <div className="control-panel">
+          <label className="field">
+            <span className="field-label">浏览器</span>
+            <select
+              value={status?.selected_browser ?? 'edge'}
+              onChange={(event) => changeBrowser(event.target.value as BrowserKind)}
+            >
+              {(status?.supported_browsers ?? ['edge', 'chrome']).map((browser) => (
+                <option key={browser} value={browser}>{browserLabel(browser)}</option>
+              ))}
+            </select>
+          </label>
+          <div className="actions spacious">
+            <button className="primary-wide" disabled={!status?.running || bootstrapping} onClick={openBrowser}>
+              打开受控浏览器
+            </button>
+            <button className="secondary" disabled={bootstrapping} onClick={() => void refresh()}>
+              刷新状态
+            </button>
+          </div>
         </div>
         <p className="hint">
-          只有从这里打开的新浏览器进程会使用 FlowRoute 代理，已有浏览器窗口和 git 命令不会受影响。
+          只有从这里打开的新浏览器进程会使用 FlowRoute 代理。已有浏览器窗口、git 命令和其它桌面应用不会受影响。
         </p>
       </section>
 
@@ -215,8 +278,8 @@ export default function App() {
         {currentPage ? (
           <>
             <p className="domain">{currentPage}</p>
-            <div className="actions">
-              <button disabled={busy} onClick={() => applyRule(currentPage, 'proxy')}>走代理</button>
+            <div className="actions spacious">
+              <button className="primary-wide" disabled={busy} onClick={() => applyRule(currentPage, 'proxy')}>走代理</button>
               <button className="secondary" disabled={busy} onClick={() => applyRule(currentPage, 'direct')}>直连</button>
               {ruleAction(currentPage) && (
                 <span className="badge">{ruleAction(currentPage) === 'proxy' ? '已设代理' : '已设直连'}</span>
