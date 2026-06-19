@@ -210,12 +210,12 @@ h2 {
 
 .card-grid {
   display: grid;
-  gap: 14px;
+  gap: 18px;
 }
 
 .control-panel {
   display: grid;
-  gap: 16px;
+  gap: 18px;
 }
 
 .section-head {
@@ -223,13 +223,24 @@ h2 {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   min-width: 0;
 }
 
 .section-head .hint {
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+.section-tag {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.12);
+  border: 1px solid rgba(96, 165, 250, 0.14);
+  color: #8fc6ff;
+  font-size: 12px;
+  letter-spacing: 0.04em;
 }
 
 .domain {
@@ -248,7 +259,7 @@ h2 {
 }
 
 .actions.spacious {
-  gap: 14px;
+  gap: 16px;
 }
 
 .actions.compact button {
@@ -335,51 +346,53 @@ input {
 
 .browser-switcher {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .segment-control {
   display: inline-grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  padding: 6px;
-  border-radius: 18px;
-  background: rgba(9, 15, 28, 0.92);
-  border: 1px solid rgba(110, 131, 169, 0.16);
+  gap: 8px;
+  padding: 8px;
+  border-radius: 20px;
+  background: rgba(6, 12, 24, 0.96);
+  border: 1px solid rgba(110, 131, 169, 0.14);
 }
 
 .segment-option {
-  min-width: 132px;
-  min-height: 44px;
-  padding: 10px 16px;
-  border-radius: 14px;
+  min-width: 136px;
+  min-height: 46px;
+  padding: 10px 18px;
+  border-radius: 16px;
   background: transparent;
-  color: #9fb0cb;
+  color: #95a8c7;
   box-shadow: none;
+  border: 1px solid transparent;
 }
 
 .segment-option.active {
-  background: linear-gradient(135deg, #1d4ed8, #0ea5e9);
+  background: linear-gradient(135deg, #1d4ed8, #0284c7);
   color: #ffffff;
-  box-shadow: 0 14px 30px rgba(14, 165, 233, 0.22);
+  border-color: rgba(125, 211, 252, 0.18);
+  box-shadow: 0 14px 30px rgba(14, 165, 233, 0.16);
 }
 
 .browser-summary {
   display: grid;
-  gap: 6px;
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: rgba(9, 15, 28, 0.78);
-  border: 1px solid rgba(110, 131, 169, 0.12);
+  gap: 8px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: rgba(7, 12, 23, 0.88);
+  border: 1px solid rgba(110, 131, 169, 0.1);
 }
 
 .browser-summary strong {
-  font-size: 18px;
+  font-size: 19px;
   letter-spacing: -0.02em;
 }
 
 .browser-summary span {
-  color: #90a1bc;
+  color: #8da0bd;
   font-size: 13px;
   line-height: 1.55;
 }

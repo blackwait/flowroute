@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, AppSettings, BrowserKind, ConnectionItem, StatusResponse, UserRule } from './api';
-
-function actionLabel(chains: string[]) {
-  const joined = chains.join(' ');
-  if (joined.includes('DIRECT')) return '直连';
-  if (joined.includes('UPSTREAM') || joined.includes('PROXY')) return '代理';
-  return joined || '未知';
-}
+import { api, AppSettings, BrowserKind, StatusResponse, UserRule } from './api';
 
 function browserLabel(browser: BrowserKind) {
   return browser === 'edge' ? 'Microsoft Edge' : 'Google Chrome';
@@ -14,8 +7,6 @@ function browserLabel(browser: BrowserKind) {
 
 export default function App() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
-  const [connections, setConnections] = useState<ConnectionItem[]>([]);
-  const [recentDomains, setRecentDomains] = useState<string[]>([]);
   const [rules, setRules] = useState<UserRule[]>([]);
   const [currentPage, setCurrentPage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -30,7 +21,7 @@ export default function App() {
     setStatus(nextStatus);
     setRules(nextRules);
     if (!nextStatus.running) {
-      setConnections([]);
+      setCurrentPage(null);
     }
   }, []);
 
@@ -38,18 +29,10 @@ export default function App() {
     try {
       const nextStatus = await api.getStatus();
       if (nextStatus.running) {
-        const [items, page] = await Promise.all([
-          api.getConnections().catch(() => []),
-          api.getCurrentPage().catch(() => null),
-        ]);
-        setConnections(items);
-        if (items.length > 0) {
-          setRecentDomains((prev) => {
-            const next = [...items.map((item) => item.domain), ...prev];
-            return [...new Set(next)].slice(0, 30);
-          });
-        }
+        const page = await api.getCurrentPage().catch(() => null);
         setCurrentPage(page);
+      } else {
+        setCurrentPage(null);
       }
     } catch (error) {
       setMessage(String(error));
@@ -242,7 +225,7 @@ export default function App() {
       <section className="card card-grid">
         <div className="section-head">
           <h2>受控浏览器</h2>
-          <span className="hint">默认 Edge，可切 Chrome</span>
+          <span className="section-tag">Edge / Chrome</span>
         </div>
         <div className="control-panel">
           <div className="browser-switcher">
@@ -262,7 +245,7 @@ export default function App() {
           </div>
           <div className="browser-summary">
             <strong>{browserLabel(status?.selected_browser ?? 'edge')}</strong>
-            <span>受控打开的新浏览器进程才会使用 FlowRoute 代理</span>
+            <span>只有从这里打开的新浏览器进程才会使用 FlowRoute 代理</span>
           </div>
           <div className="actions spacious">
             <button className="primary-wide" disabled={!status?.running || bootstrapping} onClick={openBrowser}>
@@ -296,34 +279,6 @@ export default function App() {
           </>
         ) : (
           <p className="hint">未检测到 Edge / Chrome 当前标签页。请先用上面的按钮打开浏览器，再点刷新。</p>
-        )}
-      </section>
-
-      <section className="card">
-        <div className="section-head">
-          <h2>最近访问</h2>
-          <span className="hint">{status?.running ? '浏览时会自动记录' : '开启分流后显示'}</span>
-        </div>
-        {recentDomains.length === 0 ? (
-          <p className="hint">暂无记录。开启分流后浏览网页，这里会出现最近访问的域名。</p>
-        ) : (
-          <ul className="list scrollable">
-            {recentDomains.map((domain) => {
-              const live = connections.find((item) => item.domain === domain);
-              return (
-                <li key={domain}>
-                  <div>
-                    <strong>{domain}</strong>
-                    <span>{live ? actionLabel(live.chains) : '最近访问'}</span>
-                  </div>
-                  <div className="actions compact">
-                    <button disabled={busy} onClick={() => applyRule(domain, 'proxy')}>代理</button>
-                    <button className="secondary" disabled={busy} onClick={() => applyRule(domain, 'direct')}>直连</button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
         )}
       </section>
 
