@@ -2,13 +2,16 @@ use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::fs;
+use std::net::{TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
+use std::time::Duration;
 
 use crate::dns_check::resolve_system_ipv4;
 
 pub const MIXED_PORT: u16 = 17890;
 pub const API_PORT: u16 = 19090;
 pub const API_SECRET: &str = "flowroute-local";
+pub const AUTO_DETECT_UPSTREAM_PORTS: [u16; 2] = [7897, 7890];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -36,7 +39,7 @@ impl Default for UpstreamProxy {
     Self {
       proxy_type: ProxyType::Socks5,
       host: "127.0.0.1".into(),
-      port: 7890,
+      port: 7897,
     }
   }
 }
@@ -89,17 +92,49 @@ pub fn load_settings() -> AppSettings {
   let path = settings_path();
   if path.exists() {
     if let Ok(text) = fs::read_to_string(&path) {
-      if let Ok(settings) = serde_json::from_str(&text) {
+      if let Ok(mut settings) = serde_json::from_str::<AppSettings>(&text) {
+        if !is_upstream_reachable(&settings.upstream) {
+          if let Some(port) = detect_upstream_port(&settings.upstream.host) {
+            settings.upstream.port = port;
+            let _ = save_settings(&settings);
+          }
+        }
         return settings;
       }
     }
   }
-  AppSettings::default()
+  let mut settings = AppSettings::default();
+  if let Some(port) = detect_upstream_port(&settings.upstream.host) {
+    settings.upstream.port = port;
+  }
+  settings
 }
 
 pub fn save_settings(settings: &AppSettings) -> Result<(), String> {
   let text = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
   fs::write(settings_path(), text).map_err(|e| e.to_string())
+}
+
+pub fn detect_upstream_port(host: &str) -> Option<u16> {
+  AUTO_DETECT_UPSTREAM_PORTS
+    .iter()
+    .copied()
+    .find(|port| is_host_port_reachable(host, *port))
+}
+
+pub fn is_upstream_reachable(upstream: &UpstreamProxy) -> bool {
+  is_host_port_reachable(&upstream.host, upstream.port)
+}
+
+fn is_host_port_reachable(host: &str, port: u16) -> bool {
+  let address = format!("{}:{}", host.trim(), port);
+  let timeout = Duration::from_millis(220);
+  match address.to_socket_addrs() {
+    Ok(addresses) => addresses
+      .into_iter()
+      .any(|addr| TcpStream::connect_timeout(&addr, timeout).is_ok()),
+    Err(_) => false,
+  }
 }
 
 pub fn load_user_rules() -> Vec<UserRule> {
@@ -168,8 +203,8 @@ pub fn build_dns_policy(rules: &[UserRule]) -> String {
   block
 }
 
-pub fn build_dns_hosts(rules: &[UserRule]) -> String {
-  let mut lines = Vec::new();
+pub fn build_dns_hosts(rules: &[UserRule]) -> Vec<String> {
+  let mut lines = vec!["    'localhost': 127.0.0.1".to_string()];
   for rule in rules {
     if rule.action != "direct" {
       continue;
@@ -179,6 +214,10 @@ pub fn build_dns_hosts(rules: &[UserRule]) -> String {
       lines.push(format!("    '{domain}': {ip}"));
     }
   }
+  lines
+}
+
+pub fn format_dns_hosts(lines: &[String]) -> String {
   if lines.is_empty() {
     return String::new();
   }
@@ -212,10 +251,6 @@ pub fn build_local_direct_dns_policy() -> String {
     block.push_str(&format!("    '{}': [system]\n", domain));
   }
   block
-}
-
-pub fn build_local_direct_hosts() -> String {
-  "  hosts:\n    'localhost': 127.0.0.1\n".into()
 }
 
 pub fn build_local_direct_rules() -> String {

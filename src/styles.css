@@ -194,6 +194,30 @@ h2 {
   font-size: 12px;
 }
 
+.metric-chip em {
+  color: #7890ad;
+  font-size: 10px;
+  font-style: normal;
+}
+
+.metric-button {
+  min-width: 118px;
+  text-align: left;
+  color: inherit;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.metric-button.ok {
+  border-color: rgba(34, 197, 94, 0.26);
+  background: rgba(5, 46, 22, 0.26);
+}
+
+.metric-button.warn {
+  border-color: rgba(251, 146, 60, 0.32);
+  background: rgba(67, 20, 7, 0.34);
+}
+
 .stack-actions {
   width: 132px;
   display: flex;
@@ -458,6 +482,44 @@ input {
   padding: 20px;
   display: grid;
   gap: 14px;
+}
+
+.detect-panel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.52);
+}
+
+.detect-panel.ok {
+  border-color: rgba(34, 197, 94, 0.22);
+  background: rgba(5, 46, 22, 0.2);
+}
+
+.detect-panel.warn {
+  border-color: rgba(251, 146, 60, 0.28);
+  background: rgba(67, 20, 7, 0.24);
+}
+
+.detect-panel div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.detect-panel span,
+.detect-panel em {
+  color: #8fa2c1;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.detect-panel strong {
+  font-size: 13px;
 }
 
 .modal label {

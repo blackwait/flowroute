@@ -20,6 +20,8 @@ export interface StatusResponse {
   supported_browsers: BrowserKind[];
   mixed_port: number;
   settings: AppSettings;
+  detected_upstream_port?: number | null;
+  upstream_reachable: boolean;
 }
 
 export interface ConnectionItem {
@@ -42,7 +44,7 @@ export interface AddRuleResult {
 
 export const api = {
   getStatus: () => invoke<StatusResponse>('get_status'),
-  saveSettings: (settings: AppSettings) => invoke<void>('save_app_settings', { settings }),
+  saveSettings: (settings: AppSettings) => invoke<StatusResponse>('save_app_settings', { settings }),
   start: () => invoke<StatusResponse>('start_routing'),
   stop: () => invoke<StatusResponse>('stop_routing'),
   setBrowser: (browser: BrowserKind) => invoke<StatusResponse>('set_browser', { browser }),

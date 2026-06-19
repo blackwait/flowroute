@@ -1,6 +1,7 @@
 use crate::clash_api::normalize_domain;
-use crate::config::MIXED_PORT;
+use crate::config::{self, MIXED_PORT};
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::process::Command;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,6 +31,13 @@ impl BrowserKind {
       r#"tell application "{}" to if (count of windows) > 0 then return URL of active tab of front window"#,
       self.label()
     )
+  }
+
+  fn profile_dir_name(self) -> &'static str {
+    match self {
+      Self::Edge => "edge",
+      Self::Chrome => "chrome",
+    }
   }
 }
 
@@ -74,18 +82,30 @@ pub fn launch_browser(browser: BrowserKind, target: Option<&str>) -> Result<(), 
 
   #[cfg(target_os = "macos")]
   {
+    let profile_dir = config::data_dir()
+      .join("browser-profiles")
+      .join(browser.profile_dir_name());
+    fs::create_dir_all(&profile_dir).map_err(|e| format!("创建受控浏览器配置目录失败: {e}"))?;
+
     let mut command = Command::new("open");
     command
       .arg("-n")
       .arg("-b")
       .arg(browser.bundle_id())
       .arg("--args")
-      .arg(format!("--proxy-server=http://127.0.0.1:{MIXED_PORT}"));
+      .arg(format!("--proxy-server=http://127.0.0.1:{MIXED_PORT}"))
+      .arg(format!("--user-data-dir={}", profile_dir.display()))
+      .arg("--no-first-run")
+      .arg("--new-window");
 
     if let Some(url) = target {
       let trimmed = url.trim();
       if !trimmed.is_empty() {
-        command.arg(trimmed);
+        if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+          command.arg(trimmed);
+        } else {
+          command.arg(format!("https://{trimmed}"));
+        }
       }
     }
 

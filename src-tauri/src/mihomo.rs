@@ -24,13 +24,16 @@ fn bundled_binary() -> Option<PathBuf> {
 }
 
 pub fn mihomo_binary() -> Result<PathBuf, String> {
+  if let Some(path) = bundled_binary() {
+    return Ok(path);
+  }
   let dev = dev_binary();
   if dev.exists() {
     return Ok(dev);
   }
-  bundled_binary().ok_or_else(|| {
+  Err(
     "找不到 mihomo 核心，请在项目目录运行: npm run setup".into()
-  })
+  )
 }
 
 pub fn write_mihomo_config(settings: &AppSettings) -> Result<(), String> {
@@ -38,10 +41,9 @@ pub fn write_mihomo_config(settings: &AppSettings) -> Result<(), String> {
   let rules = config::load_user_rules();
   let user_rules = config::build_inline_rules(&rules);
   let dns_policy = config::build_dns_policy(&rules);
-  let dns_hosts = config::build_dns_hosts(&rules);
+  let dns_hosts = config::format_dns_hosts(&config::build_dns_hosts(&rules));
   let sniffer_skip = config::build_sniffer_skip_domains(&rules);
   let local_dns_policy = config::build_local_direct_dns_policy();
-  let local_dns_hosts = config::build_local_direct_hosts();
   let local_direct_rules = config::build_local_direct_rules();
 
   let proxy_type = match settings.upstream.proxy_type {
@@ -93,7 +95,7 @@ dns:
     '+.google.com': [https://dns.google/dns-query, 8.8.8.8]
     '+.google.com.hk': [https://dns.google/dns-query, 8.8.8.8]
     '+.google.cn': [https://dns.google/dns-query, 8.8.8.8]
-{local_dns_policy}{dns_policy}{local_dns_hosts}{dns_hosts}proxies:
+{local_dns_policy}{dns_policy}{dns_hosts}proxies:
   - name: UPSTREAM
     type: {proxy_type}
     server: {server}
@@ -117,7 +119,6 @@ rule-providers:
 rules:
 {local_direct_rules}{user_rules}{google_rules}
   - RULE-SET,gfwlist,PROXY
-  - GEOIP,CN,DIRECT,no-resolve
   - MATCH,DIRECT
 "#,
     mixed_port = MIXED_PORT,
@@ -125,7 +126,6 @@ rules:
     secret = config::API_SECRET,
     local_dns_policy = local_dns_policy,
     dns_policy = dns_policy,
-    local_dns_hosts = local_dns_hosts,
     dns_hosts = dns_hosts,
     sniffer_skip = sniffer_skip,
     local_direct_rules = local_direct_rules,
@@ -181,13 +181,13 @@ pub fn spawn_mihomo(settings: &AppSettings) -> Result<Child, String> {
     .map_err(|e| format!("启动 mihomo 失败: {e}"))
 }
 
-pub fn wait_until_ready() {
+pub fn wait_until_ready() -> Result<(), String> {
   let url = format!("http://127.0.0.1:{}/", config::API_PORT);
   let client = reqwest::blocking::Client::builder()
     .timeout(Duration::from_millis(200))
     .build();
-  let Ok(client) = client else { return };
-  let deadline = Instant::now() + Duration::from_secs(2);
+  let client = client.map_err(|e| format!("创建健康检查客户端失败: {e}"))?;
+  let deadline = Instant::now() + Duration::from_secs(8);
   while Instant::now() < deadline {
     if client
       .get(&url)
@@ -196,10 +196,11 @@ pub fn wait_until_ready() {
       .map(|response| response.status().is_success())
       .unwrap_or(false)
     {
-      return;
+      return Ok(());
     }
     std::thread::sleep(Duration::from_millis(50));
   }
+  Err("mihomo 启动失败，请检查上游代理端口和配置".into())
 }
 
 pub fn stop_child(child: &mut Child) {

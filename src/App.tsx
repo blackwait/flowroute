@@ -141,10 +141,19 @@ export default function App() {
   const saveSettings = () =>
     withBusy(async () => {
       if (!draft) return;
-      await api.saveSettings(draft);
+      const next = await api.saveSettings(draft);
+      setStatus(next);
       setSettingsOpen(false);
-      setMessage('上游代理已保存，重新开启分流后生效');
+      setMessage(next.running ? '上游代理已保存并立即生效' : '上游代理已保存，开启分流后生效');
     });
+
+  const useDetectedUpstreamPort = () => {
+    if (!draft || !status?.detected_upstream_port) return;
+    setDraft({
+      ...draft,
+      upstream: { ...draft.upstream, port: status.detected_upstream_port },
+    });
+  };
 
   const changeBrowser = async (browser: BrowserKind) => {
     try {
@@ -171,6 +180,12 @@ export default function App() {
   const primaryHint = status?.running
     ? `127.0.0.1:${status.mixed_port} / ${browserLabel(status.selected_browser)}`
     : '不改系统代理，不影响 git 和其它应用';
+  const upstreamPort = status?.settings.upstream.port ?? 7897;
+  const detectedPort = status?.detected_upstream_port;
+  const upstreamStateText = status?.upstream_reachable ? '可用' : '不可用';
+  const upstreamHint = detectedPort
+    ? `检测到 ${detectedPort}${detectedPort === upstreamPort ? '' : '，可切换'}`
+    : '未检测到 7897/7890';
 
   return (
     <div className="app">
@@ -199,9 +214,14 @@ export default function App() {
               <strong>{browserLabel(status?.selected_browser ?? 'edge')}</strong>
             </div>
             <div className="metric-chip">
-              <span>代理端口</span>
+              <span>本地入口</span>
               <strong>{status?.mixed_port ?? 17890}</strong>
             </div>
+            <button className={`metric-chip metric-button ${status?.upstream_reachable ? 'ok' : 'warn'}`} onClick={openSettings}>
+              <span>上游端口 · {upstreamStateText}</span>
+              <strong>{upstreamPort}</strong>
+              <em>{upstreamHint}</em>
+            </button>
           </div>
         </div>
         <div className="stack-actions">
@@ -299,7 +319,23 @@ export default function App() {
         <div className="modal-backdrop" onClick={() => setSettingsOpen(false)}>
           <div className="modal" onClick={(event) => event.stopPropagation()}>
             <h2>上游代理</h2>
-            <p className="hint">默认转发到 127.0.0.1:7890（你的 Clash/V2Ray 端口），可在设置里修改。</p>
+            <p className="hint">
+              浏览器先连 17890，FlowRoute 再转发到这里。会自动检测 7897 / 7890，也允许手动修改。
+            </p>
+            <div className={`detect-panel ${status?.upstream_reachable ? 'ok' : 'warn'}`}>
+              <div>
+                <span>当前 {draft.upstream.host}:{draft.upstream.port}</span>
+                <strong>{status?.upstream_reachable ? '可连接' : '当前端口不可连接'}</strong>
+                <em>{upstreamHint}</em>
+              </div>
+              <button
+                className="secondary small"
+                disabled={!status?.detected_upstream_port || status.detected_upstream_port === draft.upstream.port}
+                onClick={useDetectedUpstreamPort}
+              >
+                用检测端口
+              </button>
+            </div>
             <label>
               协议
               <select

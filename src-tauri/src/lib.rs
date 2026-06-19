@@ -5,9 +5,9 @@ mod dns_check;
 mod mihomo;
 
 use browser::{launch_browser, supported_browsers, BrowserKind};
-use config::{load_settings, save_settings, AppSettings, UserRule, MIXED_PORT};
+use config::{detect_upstream_port, is_upstream_reachable, load_settings, save_settings, AppSettings, UserRule, MIXED_PORT};
 use clash_api::{fetch_connections, remove_user_rule, upsert_user_rule, AddRuleResult, ConnectionItem};
-use mihomo::{spawn_mihomo, stop_child, wait_until_ready};
+use mihomo::{reload_running_config, spawn_mihomo, stop_child, wait_until_ready};
 use std::process::Child;
 use std::sync::Mutex;
 use tauri::{Manager, RunEvent, State};
@@ -24,16 +24,23 @@ struct StatusResponse {
   supported_browsers: Vec<BrowserKind>,
   mixed_port: u16,
   settings: AppSettings,
+  detected_upstream_port: Option<u16>,
+  upstream_reachable: bool,
 }
 
 fn build_status(state: &EngineState, running: bool) -> StatusResponse {
   let selected_browser = *state.selected_browser.lock().unwrap();
+  let settings = load_settings();
+  let upstream_reachable = is_upstream_reachable(&settings.upstream);
+  let detected_upstream_port = detect_upstream_port(&settings.upstream.host);
   StatusResponse {
     running,
     selected_browser,
     supported_browsers: supported_browsers(),
     mixed_port: MIXED_PORT,
-    settings: load_settings(),
+    settings,
+    detected_upstream_port,
+    upstream_reachable,
   }
 }
 
@@ -44,8 +51,13 @@ fn get_status(state: State<'_, EngineState>) -> StatusResponse {
 }
 
 #[tauri::command]
-fn save_app_settings(settings: AppSettings) -> Result<(), String> {
-  save_settings(&settings)
+fn save_app_settings(state: State<'_, EngineState>, settings: AppSettings) -> Result<StatusResponse, String> {
+  save_settings(&settings)?;
+  let running = state.child.lock().unwrap().is_some();
+  if running {
+    reload_running_config(&settings)?;
+  }
+  Ok(build_status(&state, running))
 }
 
 #[tauri::command]
@@ -59,7 +71,13 @@ fn start_routing(state: State<'_, EngineState>) -> Result<StatusResponse, String
     let child = spawn_mihomo(&settings)?;
     *guard = Some(child);
   }
-  wait_until_ready();
+  if let Err(error) = wait_until_ready() {
+    let mut guard = state.child.lock().unwrap();
+    if let Some(mut child) = guard.take() {
+      stop_child(&mut child);
+    }
+    return Err(error);
+  }
   Ok(build_status(&state, true))
 }
 
