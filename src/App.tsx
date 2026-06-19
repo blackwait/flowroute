@@ -181,7 +181,7 @@ export default function App() {
             <span className={`hero-pill ${status?.running ? 'live' : 'idle'}`}>{currentStatusText}</span>
           </div>
           <h1>启动即分流，浏览器直接可用</h1>
-          <p className="subtitle">默认打开就启用分流，默认锁定 Edge。新网页进来后，规则切换和浏览器打开都在一屏完成。</p>
+          <p className="subtitle">默认打开就启用分流，默认锁定 Edge。</p>
         </div>
         <button className="ghost hero-settings" onClick={openSettings}>设置</button>
       </header>
@@ -211,13 +211,6 @@ export default function App() {
             onClick={toggleRouting}
           >
             {toggleBusy ? '处理中…' : status?.running ? '关闭分流' : '开启分流'}
-          </button>
-          <button
-            className="secondary quick-open"
-            disabled={!status?.running || bootstrapping}
-            onClick={openBrowser}
-          >
-            立即打开 Edge
           </button>
         </div>
       </section>
@@ -251,7 +244,7 @@ export default function App() {
             <button className="primary-wide" disabled={!status?.running || bootstrapping} onClick={openBrowser}>
               打开受控浏览器
             </button>
-            <button className="secondary" disabled={bootstrapping} onClick={() => void refresh()}>
+            <button className="secondary slim-button" disabled={bootstrapping} onClick={() => void refresh()}>
               刷新状态
             </button>
           </div>
